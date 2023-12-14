@@ -58,5 +58,3 @@ print(len(g))
 
 with tiledb.open(ARRAY_NAME, mode="w") as A:
     A[s, g] = c
-
-# %%
