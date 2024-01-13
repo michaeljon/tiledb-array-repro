@@ -38,20 +38,22 @@ samples = np.array(df["sequencerunid"])
 
 for sample in samples:
     counts = df.loc[df["sequencerunid"] == sample].values.flatten().tolist()[1:]
+    sample_coords = np.repeat(sample, len(counts))
 
     print(len(counts))
     print(len(genes))
+    print(len(sample))
 
     with tiledb.open(ARRAY_NAME, mode="w") as A:
-        A[sample, genes] = counts
+        A[sample_coords, genes] = counts
 
 # %%
 #
 # this cell compresses the above with inline data
 #
-s = ["01595556-0bb1-4416-8da9-cdca78fd4ab4"]
 g = ["A1BG", "A1BG-AS1", "A1CF", "A2M", "A2M-AS1"]
 c = [14, 17, 994, 2596, 47]
+s = np.repeat("01595556-0bb1-4416-8da9-cdca78fd4ab4", len(g))
 
 print(len(c))
 print(len(g))
