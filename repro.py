@@ -2,19 +2,28 @@
 import tiledb
 import pandas as pd
 import numpy as np
-from os.path import exists
-import shutil
 
-# %%
+from tqdm import tqdm
+
+import shutil
+from os.path import exists
+
+# Print TileDB-Py version
+print("TileDB-Py version: " + tiledb.__version__)
+
+# Print TileDB core version
+print("TileDB core version: " + str(tiledb.libtiledb.version()))
+
 ARRAY_NAME = "feature_counts"
 
+# %%
 if exists(ARRAY_NAME):
     shutil.rmtree(ARRAY_NAME, ignore_errors=True)
 
 # create the dimensions sequence x gene
 dims = [
-    tiledb.Dim(name="sequence", tile=None, dtype="ascii"),
-    tiledb.Dim(name="gene", tile=None, dtype="ascii"),
+    tiledb.Dim(name="sequencerunid", tile=None, domain=("", ""), dtype="ascii"),
+    tiledb.Dim(name="gene", tile=None, domain=("", ""), dtype="ascii"),
 ]
 
 # create the domain
@@ -32,29 +41,40 @@ tiledb.Array.create(ARRAY_NAME, schema)
 #
 # this cell just reads the data from counts (which might have one row, or might have many rows)
 #
-df = pd.read_csv("counts.tsv", sep="\t", header=0)
-genes = np.array(df.columns[1:])
-samples = np.array(df["sequencerunid"])
+df = pd.read_csv("counts-with-sequence-rows.tsv.gz", sep="\t", header=0, index_col=0, compression="gzip")
 
-for sample in samples:
-    counts = df.loc[df["sequencerunid"] == sample].values.flatten().tolist()[1:]
-
-    print(len(counts))
-    print(len(genes))
-
-    with tiledb.open(ARRAY_NAME, mode="w") as A:
-        A[sample, genes] = counts
-
-# %%
-#
-# this cell compresses the above with inline data
-#
-s = ["01595556-0bb1-4416-8da9-cdca78fd4ab4"]
-g = ["A1BG", "A1BG-AS1", "A1CF", "A2M", "A2M-AS1"]
-c = [14, 17, 994, 2596, 47]
-
-print(len(c))
-print(len(g))
+genes = df.columns
+samples = df.index
 
 with tiledb.open(ARRAY_NAME, mode="w") as A:
-    A[s, g] = c
+    for ndx, sample in enumerate(tqdm(samples)):
+        counts = df.iloc[ndx, :]
+        sample_coords = np.repeat(sample, len(counts))
+
+        A[sample_coords, genes] = counts
+
+# %%
+with tiledb.open(ARRAY_NAME, mode="r") as A:
+    df = A.multi_index[
+        [
+            "01595556-0bb1-4416-8da9-cdca78fd4ab4",
+            "0265cfd4-d874-49cf-b53e-61e7998547c4",
+            "02d7e850-1fc6-4c3a-8779-f073ab910180",
+            "03350543-6ed3-43be-a4fd-a08ac1472c8f",
+            "03f8bcb2-a096-4a99-b389-e09d3803ca5b",
+            "0486d86e-077b-41e3-ac41-f8df6d8c209f",
+            "04b3a558-418f-4f3b-abeb-859531486dc0",
+            "055d56b5-8422-4671-bf86-555a80c25ee0",
+            "061bbd2b-3732-4220-9253-9099a0b7ad48",
+        ],
+        [
+            "A2M",
+            "A2M-AS1",
+            "A2ML1",
+        ],
+    ]
+
+    print(df["count"].mean())
+
+    # print(A.df[A.df["gene"].str.startswith("MIR")].groupby("gene").mean("count"))
+# %%
